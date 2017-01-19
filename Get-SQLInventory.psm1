@@ -76,6 +76,15 @@
             $Cores = $Cores + $Processor.NumberOfCores
         }
 
+        # Search for SQL Install Date
+        $Result = Invoke-Command -ScriptBlock {Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | `
+            Where-Object {$_.DisplayName -like '*SQL Server*' -and $_.DisplayName -notlike '*Compact*'}} -ComputerName $ComputerName
+
+        # Grab the first install date if a result is returned
+        If($Result){
+            $InstallDate = $Result[0].InstallDate
+        }
+
         # Create custom object to hold discovered properties
         $Sql_Inventory = New-Object PSObject
         $Sql_Inventory | Add-Member -MemberType NoteProperty -Name ServerName -Value $ComputerName
@@ -84,6 +93,7 @@
         $Sql_Inventory | Add-Member -MemberType NoteProperty -Name CPUNumber -Value $CPUs
         $Sql_Inventory | Add-Member -MemberType NoteProperty -Name TotalCores -Value $Cores
         $Sql_Inventory | Add-Member -MemberType NoteProperty -Name MemoryGB -Value $Memory
+        $Sql_Inventory | Add-Member -MemberType NoteProperty -Name InstallDate -Value $InstallDate
 
         # Registry key to look in for SQL information
         $Base = "SOFTWARE\"
@@ -116,8 +126,8 @@
                 $InstKey = $regKey.OpenSubkey("$($base)\Microsoft\Microsoft SQL Server\$instName\Setup")
 
                 # Add discovered SQL info to the psobj
-                $Sql_Inventory | Add-Member -MemberType NoteProperty -Name Edition -Value $instKey.GetValue("Edition") -Force # read Ed value
-                $Sql_Inventory | Add-Member -MemberType NoteProperty -Name Version -Value $instKey.GetValue("Version") -Force # read Ver value
+                $Sql_Inventory | Add-Member -MemberType NoteProperty -Name Edition -Value $instKey.GetValue("Edition") -Force # read Edition value
+                $Sql_Inventory | Add-Member -MemberType NoteProperty -Name Version -Value $instKey.GetValue("Version") -Force # read Version value
 
                 # return an object, useful for many things
                 Return $Sql_Inventory
